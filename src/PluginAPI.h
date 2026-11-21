@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
 /*Plugins should register for messages from hdtSMP64 via SKSE during SKSE's PostLoad event.
 * When ready, hdtSMP64 will send a message of type MSG_STARTUP containing a PluginInterface* as data.
 *
@@ -42,6 +45,26 @@ namespace hdt
 	using IPreStepListener = RE::BSTEventSink<PreStepEvent>;
 	using IPostStepListener = RE::BSTEventSink<PostStepEvent>;
 
+	// Sent immediately before FSMP skins one SkinnedMeshBody's vertices.
+	// This callback runs on the physics/update thread. The event and its accessors
+	// are valid only until the callback returns; never retain context or call game
+	// thread-only APIs from the listener.
+	struct PreSkinningEvent
+	{
+		// Unique for this body instance; a rebuilt body receives a new ID.
+		std::uint64_t bodyId{ 0 };
+		// FormID associated with the skeleton at body construction; zero if unavailable.
+		std::uint32_t ownerFormId{ 0 };
+		const char* bodyName{ nullptr };
+		std::size_t vertexCount{ 0 };
+		bool usesBoundingSphere{ false };
+		void* context{ nullptr };
+		void (*getSkinPosition)(void* context, std::size_t index, float outXYZ[3]){ nullptr };
+		void (*setSkinPosition)(void* context, std::size_t index, const float xyz[3]){ nullptr };
+	};
+
+	using IPreSkinningListener = RE::BSTEventSink<PreSkinningEvent>;
+
 	class PluginInterface
 	{
 	public:
@@ -64,7 +87,7 @@ namespace hdt
 		};
 
 	public:
-		constexpr static Version INTERFACE_VERSION{ 2, 0, 0 };
+		constexpr static Version INTERFACE_VERSION{ 2, 1, 0 };
 		constexpr static Version BULLET_VERSION{ 3, 24, 0 };
 
 	public:
@@ -77,5 +100,8 @@ namespace hdt
 
 		virtual void addListener(IPostStepListener*) = 0;
 		virtual void removeListener(IPostStepListener*) = 0;
+
+		virtual void addListener(IPreSkinningListener*) = 0;
+		virtual void removeListener(IPreSkinningListener*) = 0;
 	};
 }

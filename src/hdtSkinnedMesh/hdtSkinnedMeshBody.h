@@ -7,6 +7,8 @@
 
 #include <BulletCollision/Gimpact/btBoxCollision.h>
 
+#include <cstdint>
+
 namespace hdt
 {
 	class SkinnedMeshShape;
@@ -71,6 +73,10 @@ namespace hdt
 		};
 
 		RE::BSFixedString m_name;
+
+		// WBVP metadata; not used by FSMP's skinning or collision algorithms.
+		std::uint64_t m_wbvpBodyId{ 0 };
+		std::uint32_t m_wbvpOwnerFormId{ 0 };
 
 		//		int m_priority;
 		bool m_isKinematic;

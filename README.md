@@ -25,3 +25,9 @@ For current known bugs, see the [Nexus bugs tab](https://nexusmods.com/skyrimspe
 ## Credits
 
 See the [Hall of Fame](https://github.com/DaymareOn/hdtSMP64/wiki/01-%E2%80%90-Hall-of-Fame) for the full list of contributors and acknowledgements.
+
+## WBVP fork notes
+
+This fork tracks `DaymareOn/hdtSMP64` on the `dev` branch. WBVP-specific
+changes and upstream update guidance are documented in
+`WBVP-FSMP-INTEGRATION.md` and `WBVP-FSMP-UPSTREAM.md`.

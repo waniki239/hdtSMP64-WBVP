@@ -1,13 +1,18 @@
 #include "hdtSkinnedMeshBody.h"
+#include "../PluginInterfaceImpl.h"
 #include "hdtSkinnedMeshShape.h"
 
 #include <tbb/tbb.h>
+
+#include <atomic>
 
 namespace hdt
 {
 
 	SkinnedMeshBody::SkinnedMeshBody()
 	{
+		static std::atomic<std::uint64_t> nextWbvpBodyId{ 1 };
+		m_wbvpBodyId = nextWbvpBodyId.fetch_add(1, std::memory_order_relaxed);
 		m_collisionShape = &m_bulletShape;
 	}
 
@@ -54,6 +59,31 @@ namespace hdt
 			bonesDst[i].m_vertexToWorld = btMatrix4x3T(boneT) * v.vertexToBone;
 			bonesDst[i].m_maginMultipler = v.ptr->m_marginMultipler * boneT.getScale();
 		}
+
+		// Allow plugins to deform skin-space input positions before FSMP performs
+		// its normal bone skinning. The accessors deliberately hide Vertex layout.
+		const PreSkinningEvent preSkinningEvent{
+			m_wbvpBodyId,
+			m_wbvpOwnerFormId,
+			m_name.data(),
+			m_vertices.size(),
+			m_useBoundingSphere,
+			this,
+			[](void* context, std::size_t index, float outXYZ[3]) {
+				const auto* body = static_cast<const SkinnedMeshBody*>(context);
+				if (!body || index >= body->m_vertices.size() || !outXYZ) return;
+				const auto& p = body->m_vertices[index].m_skinPos;
+				outXYZ[0] = static_cast<float>(p.x());
+				outXYZ[1] = static_cast<float>(p.y());
+				outXYZ[2] = static_cast<float>(p.z());
+			},
+			[](void* context, std::size_t index, const float xyz[3]) {
+				auto* body = static_cast<SkinnedMeshBody*>(context);
+				if (!body || index >= body->m_vertices.size() || !xyz) return;
+				body->m_vertices[index].m_skinPos.setValue(xyz[0], xyz[1], xyz[2]);
+			}
+		};
+		g_pluginInterface.onPreSkinning(preSkinningEvent);
 
 		const int size = static_cast<int>(m_vpos.size());
 		const Vertex* __restrict verts = m_vertices.data();

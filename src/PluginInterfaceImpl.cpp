@@ -49,3 +49,17 @@ void hdt::PluginInterfaceImpl::init(const SKSE::LoadInterface* skse)
 		logger::warn("Failed to get a messaging interface. Plugins will not work.");
 	}
 }
+
+void hdt::PluginInterfaceImpl::addListener(IPreSkinningListener* l)
+{
+	if (l) {
+		m_preSkinningDispatcher.AddEventSink(l);
+	}
+}
+
+void hdt::PluginInterfaceImpl::removeListener(IPreSkinningListener* l)
+{
+	if (l) {
+		m_preSkinningDispatcher.RemoveEventSink(l);
+	}
+}

@@ -706,6 +706,11 @@ namespace hdt
 	{
 		RE::BSTSmartPointer<SkyrimBody> body = RE::make_smart<SkyrimBody>();
 		body->m_name = name;
+		if (m_skeleton) {
+			if (auto* userData = m_skeleton->GetUserData()) {
+				body->m_wbvpOwnerFormId = userData->formID;
+			}
+		}
 
 		int vertexStart = 0;
 		int boneStart = 0;
