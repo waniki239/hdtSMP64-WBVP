@@ -65,7 +65,7 @@ namespace hdt
 		const PreSkinningEvent preSkinningEvent{
 			m_wbvpBodyId,
 			m_wbvpOwnerFormId,
-			m_name.data(),
+			m_name.c_str(),
 			m_vertices.size(),
 			m_useBoundingSphere,
 			this,
