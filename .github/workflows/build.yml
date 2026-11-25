@@ -33,6 +33,7 @@ on:
       - master
       - dev
       - hardenrelease
+      - wbvp-integration
       - "ci/**"
     paths:
       - "**.cpp"
