@@ -44,6 +44,12 @@ static void __float32(float* __restrict out, const uint16_t in)
 
 namespace hdt
 {
+	// Narrow runtime tracing for the HP2B wig collision meshes under investigation.
+	static bool isHP2BWigTraceName(const std::string& name)
+	{
+		return name.find("HP2BcolWig") != std::string::npos;
+	}
+
 	static constexpr float PI = 3.1415926535897932384626433832795f;
 
 	btEmptyShape SkyrimSystemCreator::BoneTemplate::emptyShape[1];
@@ -722,11 +728,20 @@ namespace hdt
 			// (for example when doing the smp reset).
 			auto* triShape = castBSTriShape(findObject(m_model, meshName.c_str()));
 			auto* dynamicShape = castBSDynamicTriShape(findObject(m_model, meshName.c_str()));
+			const bool traceMesh = isHP2BWigTraceName(name) || isHP2BWigTraceName(meshName);
+			if (traceMesh) {
+				logger::info("[WBVP-TRACE] generateMeshBody XMLShape='{}' candidate='{}' foundTriShape={} foundDynamicShape={}",
+					name.c_str(), meshName.c_str(), triShape != nullptr, dynamicShape != nullptr);
+			}
 			if (!triShape) {
+				if (traceMesh)
+					logger::info("[WBVP-TRACE] generateMeshBody SKIP no BSTriShape candidate='{}'", meshName.c_str());
 				continue;
 			}
 
 			if (!triShape->GetGeometryRuntimeData().skinInstance) {
+				if (traceMesh)
+					logger::info("[WBVP-TRACE] generateMeshBody SKIP no SkinInstance candidate='{}'", meshName.c_str());
 				continue;
 			}
 
@@ -754,6 +769,11 @@ namespace hdt
 			}
 
 			RE::NiSkinPartition* skinPartition = triShape->GetGeometryRuntimeData().skinInstance->skinPartition.get();
+			if (traceMesh) {
+				logger::info("[WBVP-TRACE] generateMeshBody SKINNED candidate='{}' bones={} partition={} vertices={}",
+					meshName.c_str(), skinData ? skinData->GetBoneCount() : 0, skinPartition != nullptr,
+					skinPartition ? skinPartition->vertexCount : 0);
+			}
 			body->m_vertices.resize(vertexStart + skinPartition->vertexCount);
 
 			// vertices data are all the same in every partitions
@@ -825,9 +845,14 @@ namespace hdt
 		}
 
 		if (0 == vertexStart) {
+			if (isHP2BWigTraceName(name))
+				logger::info("[WBVP-TRACE] generateMeshBody FAIL XMLShape='{}' no vertices generated", name.c_str());
 			m_reader->skipCurrentElement();
 			return { nullptr, {} };
 		}
+		if (isHP2BWigTraceName(name))
+			logger::info("[WBVP-TRACE] generateMeshBody SUCCESS XMLShape='{}' vertices={} candidateCount={}",
+				name.c_str(), vertexStart, names->size());
 
 		for (auto& i : body->m_vertices)
 			i.sortWeight();
