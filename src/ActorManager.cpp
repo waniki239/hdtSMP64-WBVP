@@ -232,8 +232,12 @@ namespace hdt
 
 	RE::BSEventNotifyControl ActorManager::ProcessEvent(const Events::SkinSingleHeadGeometryEvent* e, RE::BSTEventSource<Events::SkinSingleHeadGeometryEvent>*)
 	{
+		const auto ownerFormID = e && e->skeleton && e->skeleton->GetUserData() ? e->skeleton->GetUserData()->formID : 0;
+		logger::info("[WBVP-TRACE] EVENT SkinSingleHeadGeometry owner={:08X} skeleton={} headNode={} geometry='{}'",
+			ownerFormID, static_cast<const void*>(e ? e->skeleton : nullptr), static_cast<const void*>(e ? e->headNode : nullptr),
+			e && e->geometry ? e->geometry->name.c_str() : "<null>");
 		// This case never happens to a lurker skeleton, thus we don't need to test.
-		auto npc = findNode(e->skeleton, "NPC");
+		auto npc = e && e->skeleton ? findNode(e->skeleton, "NPC") : nullptr;
 		if (npc == nullptr) {
 			return RE::BSEventNotifyControl::kContinue;
 		}
@@ -280,8 +284,11 @@ namespace hdt
 
 	RE::BSEventNotifyControl ActorManager::ProcessEvent(const Events::SkinAllHeadGeometryEvent* e, RE::BSTEventSource<Events::SkinAllHeadGeometryEvent>*)
 	{
+		const auto ownerFormID = e && e->skeleton && e->skeleton->GetUserData() ? e->skeleton->GetUserData()->formID : 0;
+		logger::info("[WBVP-TRACE] EVENT SkinAllHeadGeometry owner={:08X} skeleton={} headNode={} hasSkinned={}",
+			ownerFormID, static_cast<const void*>(e ? e->skeleton : nullptr), static_cast<const void*>(e ? e->headNode : nullptr), e ? e->hasSkinned : false);
 		// This case never happens to a lurker skeleton, thus we don't need to test.
-		auto npc = findNode(e->skeleton, "NPC");
+		auto npc = e && e->skeleton ? findNode(e->skeleton, "NPC") : nullptr;
 		if (!npc) {
 			return RE::BSEventNotifyControl::kContinue;
 		}
@@ -1289,6 +1296,9 @@ namespace hdt
 
 	void ActorManager::Skeleton::scanHead()
 	{
+		const auto ownerFormID = skeleton && skeleton->GetUserData() ? skeleton->GetUserData()->formID : 0;
+		logger::info("[WBVP-TRACE] scanHead ENTER owner={:08X} headParts={} fullSkinning={} headNode={}",
+			ownerFormID, head.headParts.size(), head.isFullSkinning, static_cast<const void*>(head.headNode.get()));
 		if (isFirstPersonSkeleton(this->skeleton.get())) {
 			logger::debug("Not scanning head of first person skeleton.");
 			return;
@@ -1313,7 +1323,9 @@ namespace hdt
 			headPart.clearPhysics();
 
 			const char* headPartName = headPart.headPart ? headPart.headPart->name.c_str() : "<null>";
-			const bool traceHeadPart = std::string(headPartName).find("HP2BcolWig") != std::string::npos;
+			const bool traceHeadPart = true;
+			logger::info("[WBVP-TRACE] scanHead PART owner={:08X} HeadPart='{}' physicsFile='{}'",
+				ownerFormID, headPartName, headPart.physicsFile.first.c_str());
 			if (traceHeadPart) {
 				logger::info("[WBVP-TRACE] scanHead HeadPart='{}' physicsFile='{}' active={}",
 					headPartName, headPart.physicsFile.first.c_str(), isActive);
