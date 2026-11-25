@@ -69,13 +69,17 @@ namespace Events
 
 		RE::BSEventNotifyControl FreezeEventHandler::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, [[maybe_unused]] RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_eventSource)
 		{
+			if (a_event && a_event->menuName == "RaceSex Menu") {
+				logger::info("[WBVP-TRACE] EVENT RaceSexMenu opening={}", a_event->opening);
+			}
+
 			if (a_event && a_event->opening && (a_event->menuName == "Loading Menu" || a_event->menuName == "RaceSex Menu")) {
 				logger::debug("{} detected, scheduling physics reset on world un-suspend.", a_event->menuName);
 				hdt::SkyrimPhysicsWorld::get()->suspend(true);
 			}
 
 			if (a_event && !a_event->opening && (a_event->menuName == "RaceSex Menu")) {
-				logger::debug("Racemenu closed, reloading meshes.");
+				logger::info("[WBVP-TRACE] RaceSexMenu closed; reloading meshes.");
 				hdt::ActorManager::instance()->ProcessEvent(a_event, a_eventSource);
 			}
 
