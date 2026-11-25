@@ -1312,17 +1312,32 @@ namespace hdt
 			// always regen physics for all head parts
 			headPart.clearPhysics();
 
+			const char* headPartName = headPart.headPart ? headPart.headPart->name.c_str() : "<null>";
+			const bool traceHeadPart = std::string(headPartName).find("HP2BcolWig") != std::string::npos;
+			if (traceHeadPart) {
+				logger::info("[WBVP-TRACE] scanHead HeadPart='{}' physicsFile='{}' active={}",
+					headPartName, headPart.physicsFile.first.c_str(), isActive);
+			}
+
 			if (headPart.physicsFile.first.empty()) {
 				logger::debug("No physics file for headpart {}.", headPart.headPart->name);
+				if (traceHeadPart)
+					logger::info("[WBVP-TRACE] scanHead SKIP no physics file HeadPart='{}'", headPartName);
 				continue;
 			}
 
 			if (physicsDupes.count(headPart.physicsFile.first)) {
 				logger::debug("Previous head part generated physics system for file {}, skipping.", headPart.physicsFile.first.c_str());
+				if (traceHeadPart)
+					logger::info("[WBVP-TRACE] scanHead SKIP duplicate physicsFile='{}' HeadPart='{}'",
+						headPart.physicsFile.first.c_str(), headPartName);
 				continue;
 			}
 
 			logger::debug("Try create system for headpart {} physics file {}.", headPart.headPart->name, headPart.physicsFile.first.c_str());
+			if (traceHeadPart)
+				logger::info("[WBVP-TRACE] scanHead CREATE HeadPart='{}' physicsFile='{}'",
+					headPartName, headPart.physicsFile.first.c_str());
 			physicsDupes.insert(headPart.physicsFile.first);
 			auto renameMap = this->head.renameMap;
 			auto system = SkyrimSystemCreator().createOrUpdateSystem(npc.get(), this->head.headNode.get(), &headPart.physicsFile, std::move(renameMap), nullptr);
@@ -1330,6 +1345,12 @@ namespace hdt
 				logger::debug("Success.");
 				headPart.setPhysics(system, isActive);
 				hasPhysics = true;
+				if (traceHeadPart)
+					logger::info("[WBVP-TRACE] scanHead SUCCESS HeadPart='{}' bodyCount={}",
+						headPartName, system->meshes().size());
+			} else if (traceHeadPart) {
+				logger::info("[WBVP-TRACE] scanHead FAIL HeadPart='{}' physicsFile='{}'",
+					headPartName, headPart.physicsFile.first.c_str());
 			}
 		}
 	}
@@ -1382,8 +1403,16 @@ namespace hdt
 		// Skinning
 		logger::debug("Skinning geometry to skeleton.");
 
+		const bool traceGeometry = std::string(geometry->name.c_str()).find("HP2BcolWig") != std::string::npos;
+		if (traceGeometry) {
+			logger::info("[WBVP-TRACE] processGeometry BEGIN geometry='{}' skinInstance={} headPartCount={}",
+				geometry->name.c_str(), geometry->GetGeometryRuntimeData().skinInstance != nullptr, this->head.headParts.size());
+		}
+
 		if (!geometry->GetGeometryRuntimeData().skinInstance || !geometry->GetGeometryRuntimeData().skinInstance->skinData) {
 			logger::error("Geometry is missing skin instance - how?");
+			if (traceGeometry)
+				logger::info("[WBVP-TRACE] processGeometry FAIL missing skin data geometry='{}'", geometry->name.c_str());
 			return;
 		}
 
@@ -1683,5 +1712,12 @@ namespace hdt
 		}
 
 		logger::debug("Done skinning part.");
+		if (traceGeometry) {
+			const auto& runtimeData = geometry->GetGeometryRuntimeData();
+			logger::info("[WBVP-TRACE] processGeometry DONE geometry='{}' physicsFile='{}' skinBones={} merged={} renamed={}",
+				geometry->name.c_str(), head.headParts.back().physicsFile.first.c_str(),
+				runtimeData.skinInstance && runtimeData.skinInstance->skinData ? runtimeData.skinInstance->skinData->GetBoneCount() : 0,
+				hasMerged, hasRenames);
+		}
 	}
 }
