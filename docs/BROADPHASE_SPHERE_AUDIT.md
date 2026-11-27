@@ -51,3 +51,18 @@ When the option is enabled, the diagnostic build also samples the player hair Bo
 - `[BroadphasePairAuditNarrowphase]`: confirms that `SkinnedMeshAlgorithm::processCollision` was invoked after a midphase overlap.
 
 The world and dispatcher samples are independent counters, so their frame numbers are local to each diagnostic stage. These records are sampled diagnostics, not a complete per-frame trace. The narrowphase line records invocation, not whether a contact point or solver response was ultimately produced.
+
+
+## Contact and manifold audit
+
+For the target `_HP2colWigFull` pair, the diagnostic build also emits:
+
+- `[CollisionContactAuditCandidates]`: per shape-direction call, the number of collider-pair checks that returned a contact result and were retained up to `MaxCollisionCount`. A triangle/vertex pair can produce a separate line for each direction.
+- `[CollisionContactAuditMerge]`: number of active MergeBuffer cells after aggregation and the number of calls that inserted a point into a Bullet manifold.
+
+Interpretation:
+
+- Candidate results greater than zero but no active merge cells indicate that collision results did not produce accumulated bone-pair contributions.
+- Active merge cells greater than zero but zero manifold additions indicate that the accumulated entries were rejected during the final application stage.
+- A positive manifold-add count confirms that FSMP called `addManifoldPoint`; it does not by itself prove that Bullet retained every point, generated a solver constraint, or produced a visible physical response.
+- These are per-pair diagnostic records. They do not change collision calculations, thresholds, or manifold contents. The additional logging is enabled only with `HDT_BROADPHASE_SPHERE_AUDIT`.
