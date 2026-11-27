@@ -185,13 +185,24 @@ jobs:
           # 2. Set the environment variable so the vcpkg toolchain sees it
           $env:VCPKG_BINARY_SOURCES = "clear;files,$BinaryCachePath,readwrite"
 
-          # 3. Run the configuration
+          # 3. Enable the broadphase sphere audit only for its dedicated diagnostic branch/PR.
+          # Normal dev/master/release builds remain unchanged.
+          $AuditArgs = @()
+          if ("${{ github.head_ref || github.ref_name }}" -eq "diag/broadphase-sphere-audit") {
+              $AuditArgs = @("-DHDT_BROADPHASE_SPHERE_AUDIT=ON")
+              Write-Host "Broadphase sphere audit: ENABLED"
+          } else {
+              Write-Host "Broadphase sphere audit: disabled"
+          }
+
+          # 4. Run the configuration
           cmake --preset ${{ matrix.preset }} `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_MANIFEST_MODE=ON `
             -DCompiledPluginsPath="${{ github.workspace }}/out/build/${{ matrix.preset }}/plugins" `
             -DPROJECT_BUILD_INFO="${{ needs.prepare.outputs.build_info }}" `
-            -DBUILD_VALIDATOR_TESTS=ON
+            -DBUILD_VALIDATOR_TESTS=ON `
+            $AuditArgs
 
       - name: Create the CompiledPluginsPath folder structure
         run: mkdir -p "${{ github.workspace }}/out/build/${{ matrix.preset }}/plugins/SKSE/Plugins/"
