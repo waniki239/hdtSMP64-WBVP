@@ -17,6 +17,7 @@ namespace hdt
 {
 	namespace
 	{
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
 		std::atomic<uint64_t> g_broadphaseAuditFrame{ 0 };
 
 		bool isBroadphaseAuditTarget(const btCollisionObject* object)
@@ -27,6 +28,7 @@ namespace hdt
 			auto* body = static_cast<const SkinnedMeshBody*>(object);
 			return body->m_name.c_str() && std::string_view(body->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos;
 		}
+#endif
 
 		int initBulletTbbAndGetThreadCount()
 		{
