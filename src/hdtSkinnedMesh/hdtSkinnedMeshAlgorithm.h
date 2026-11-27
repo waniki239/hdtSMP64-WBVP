@@ -2,6 +2,7 @@
 
 #include "hdtDispatcher.h"
 #include "hdtSkinnedMeshShape.h"
+#include <atomic>
 
 namespace hdt
 {
@@ -14,6 +15,21 @@ namespace hdt
 		Collider* colliderB;
 		float depth;
 	};
+
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+	struct CollisionAuditStats
+	{
+		std::atomic<uint64_t> colliderCandidates{ 0 }, narrowTests{ 0 }, rawHits{ 0 };
+		std::atomic<uint64_t> storedResults{ 0 }, overflowResults{ 0 };
+		std::atomic<uint64_t> mergeInput{ 0 }, depthBreaks{ 0 }, noFlexibleWeight{ 0 };
+		std::atomic<uint64_t> weightThresholdRejectA{ 0 }, weightThresholdRejectB{ 0 };
+		std::atomic<uint64_t> kinematicReject{ 0 }, opposingNormalReject{ 0 }, mergedContributions{ 0 };
+		std::atomic<uint64_t> activeCells{ 0 }, emptyCells{ 0 }, collisionFilterReject{ 0 };
+		std::atomic<uint64_t> applyKinematicReject{ 0 }, sameBoneReject{ 0 }, zeroNormalReject{ 0 };
+		std::atomic<uint64_t> nonPenetratingReject{ 0 }, manifoldAddCalls{ 0 };
+		std::atomic<uint64_t> manifoldPointTotal{ 0 }, manifoldPointMax{ 0 };
+	};
+#endif
 
 	class SkinnedMeshAlgorithm
 	{
@@ -108,9 +124,9 @@ namespace hdt
 			}
 
 			template <class T0, class T1>
-			void doMerge(T0* shape0, T1* shape1, CollisionResult* collisions, int count);
+			void doMerge(T0* shape0, T1* shape1, CollisionResult* collisions, int count\n#if defined(HDT_BROADPHASE_SPHERE_AUDIT)\n\t\t\t\t, CollisionAuditStats* audit\n#endif\n\t\t\t);
 
-			void apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, CollisionDispatcher* dispatcher);
+			void apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, CollisionDispatcher* dispatcher\n#if defined(HDT_BROADPHASE_SPHERE_AUDIT)\n\t\t\t\t, CollisionAuditStats* audit\n#endif\n\t\t\t);
 
 			int mergeStride;
 			int mergeSize;
@@ -121,6 +137,6 @@ namespace hdt
 		};
 
 		template <class T0, class T1>
-		static void processCollision(T0* shape0, T1* shape1, MergeBuffer& merge, CollisionResult* collision);
+		static void processCollision(T0* shape0, T1* shape1, MergeBuffer& merge, CollisionResult* collision\n#if defined(HDT_BROADPHASE_SPHERE_AUDIT)\n\t\t\t, CollisionAuditStats* audit\n#endif\n\t\t);
 	};
 }
