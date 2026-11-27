@@ -37,3 +37,17 @@ The check uses `SkinnedBone::vertexToBone` and the `localBoundingSphere` that FS
 - The audit examines the source geometry at Body construction. It does not independently model later morph/weight changes to the mesh.
 
 This diagnostic is intended to decide whether further instrumentation of the runtime AABB and broadphase pair selection is warranted.
+
+## Runtime broadphase pair audit
+
+When the option is enabled, the diagnostic build also samples the player hair Body named
+`_HP2colWigFull` once every 60 physics collision-detection passes:
+
+- `[BroadphasePairAuditAabb]`: the world-space AABB submitted to Bullet for the hair Body.
+- `[BroadphasePairAuditRawPair]`: a raw overlapping pair returned by Bullet's broadphase, with the other Body name.
+- `[BroadphasePairAuditSummary]`: total broadphase pair count and the number involving the target hair Body. A zero target-pair count means the broadphase did not return a pair for that sampled pass.
+- `[BroadphasePairAuditFilter]`: whether FSMP's `needsCollision` filter accepted the raw pair.
+- `[BroadphasePairAuditMidphase]`: whether the BVH midphase found an overlap for an accepted pair.
+- `[BroadphasePairAuditNarrowphase]`: confirms that `SkinnedMeshAlgorithm::processCollision` was invoked after a midphase overlap.
+
+The world and dispatcher samples are independent counters, so their frame numbers are local to each diagnostic stage. These records are sampled diagnostics, not a complete per-frame trace. The narrowphase line records invocation, not whether a contact point or solver response was ultimately produced.
