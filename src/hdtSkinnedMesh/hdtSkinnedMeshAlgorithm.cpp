@@ -1,6 +1,7 @@
 #include "hdtSkinnedMeshAlgorithm.h"
 #include "hdtCollider.h"
 #include <tbb/task_arena.h>
+#include <string_view>
 
 namespace hdt
 {
@@ -508,8 +509,8 @@ namespace hdt
 		if (auditTarget) {
 			logger::info("[CollisionContactAuditCandidates] body0={} body1={} shape0={} shape1={} acceptedColliderResults={}",
 				auditBody0->m_name.c_str(), auditBody1->m_name.c_str(),
-				shape0->asPerTriangleShape() ? "triangle" : "vertex",
-				shape1->asPerTriangleShape() ? "triangle" : "vertex", count);
+				auditBody0->m_shape->asPerTriangleShape() ? "triangle" : "vertex",
+				auditBody1->m_shape->asPerTriangleShape() ? "triangle" : "vertex", count);
 		}
 #endif
 		if (count > 0) {
