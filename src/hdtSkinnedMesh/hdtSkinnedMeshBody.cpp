@@ -232,6 +232,63 @@ namespace hdt
 		m_vpos.resize(numUsed);
 
 		m_useBoundingSphere = m_shape->m_colliders.size() > 10;
+
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+		// Diagnostic-only audit: verify that every positively weighted source vertex
+		// influence is contained by the static per-bone sphere used by Bullet broadphase.
+		// This does not alter collision behavior.
+		struct SphereAuditStats
+		{
+			uint64_t influences = 0;
+			uint64_t outside = 0;
+			float maxExcess = 0.0f;
+			float maxDistanceRadiusRatio = 0.0f;
+		};
+		std::vector<SphereAuditStats> audit(m_skinnedBones.size());
+		SphereAuditStats total;
+
+		for (const auto& vertex : m_vertices) {
+			for (int influence = 0; influence < 4; ++influence) {
+				if (vertex.m_weight[influence] <= FLT_EPSILON)
+					continue;
+
+				const auto boneIdx = vertex.getBoneIdx(influence);
+				if (boneIdx >= m_skinnedBones.size())
+					continue;
+
+				const auto& bone = m_skinnedBones[boneIdx];
+				const auto localPosition = bone.vertexToBone * vertex.m_skinPos;
+				const float distance = (localPosition - bone.localBoundingSphere.center()).length();
+				const float radius = bone.localBoundingSphere.radius();
+				const float excess = distance - radius;
+				auto& stats = audit[boneIdx];
+
+				++stats.influences;
+				++total.influences;
+				if (excess > 0.0f) {
+					++stats.outside;
+					++total.outside;
+				}
+				stats.maxExcess = std::max(stats.maxExcess, excess);
+				total.maxExcess = std::max(total.maxExcess, excess);
+				const float ratio = radius > FLT_EPSILON ? distance / radius : (distance > 0.0f ? FLT_MAX : 0.0f);
+				stats.maxDistanceRadiusRatio = std::max(stats.maxDistanceRadiusRatio, ratio);
+				total.maxDistanceRadiusRatio = std::max(total.maxDistanceRadiusRatio, ratio);
+			}
+		}
+
+		logger::info("[BroadphaseSphereAudit] body={} bones={} vertices={} influences={} outside={} maxExcess={} maxDistanceRadiusRatio={}",
+			m_name.c_str(), m_skinnedBones.size(), m_vertices.size(), total.influences, total.outside,
+			total.maxExcess, total.maxDistanceRadiusRatio);
+		for (size_t i = 0; i < audit.size(); ++i) {
+			const auto& stats = audit[i];
+			if (stats.outside == 0)
+				continue;
+			logger::info("[BroadphaseSphereAuditBone] body={} bone={} influences={} outside={} maxExcess={} maxDistanceRadiusRatio={}",
+				m_name.c_str(), m_skinnedBones[i].ptr->m_name.c_str(), stats.influences, stats.outside,
+				stats.maxExcess, stats.maxDistanceRadiusRatio);
+		}
+#endif
 	}
 
 	bool SkinnedMeshBody::canCollideWith(const SkinnedMeshBody* body) const
