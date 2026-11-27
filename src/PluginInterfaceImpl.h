@@ -2,6 +2,8 @@
 
 #include "PluginAPI.h"
 
+#include <atomic>
+
 namespace hdt
 {
 	class PluginInterfaceImpl final : public PluginInterface
@@ -31,7 +33,12 @@ namespace hdt
 		void onPreStep(const PreStepEvent& e) { m_preStepDispatcher.SendEvent(std::addressof(e)); }
 		void onPostStep(const PostStepEvent& e) { m_postStepDispatcher.SendEvent(std::addressof(e)); }
 		void onPreSkinning(const PreSkinningEvent& e) { m_preSkinningDispatcher.SendEvent(std::addressof(e)); }
-		void onPostSkinning(const PostSkinningEvent& e) { m_postSkinningDispatcher.SendEvent(std::addressof(e)); }
+		bool hasPostSkinningListeners() const noexcept { return m_postSkinningListenerCount.load(std::memory_order_acquire) != 0; }
+		void onPostSkinning(const PostSkinningEvent& e) {
+			if (hasPostSkinningListeners()) {
+				m_postSkinningDispatcher.SendEvent(std::addressof(e));
+			}
+		}
 
 		void init(const SKSE::LoadInterface* skse);
 
@@ -41,6 +48,7 @@ namespace hdt
 		RE::BSTEventSource<PostStepEvent> m_postStepDispatcher;
 		RE::BSTEventSource<PreSkinningEvent> m_preSkinningDispatcher;
 		RE::BSTEventSource<PostSkinningEvent> m_postSkinningDispatcher;
+		std::atomic_size_t m_postSkinningListenerCount{ 0 };
 
 		SKSE::PluginHandle m_sksePluginHandle;
 		SKSE::MessagingInterface* m_skseMessagingInterface;
