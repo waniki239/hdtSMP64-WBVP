@@ -23,12 +23,15 @@ namespace hdt
 
 		virtual void addListener(IPreSkinningListener* l) override;
 		virtual void removeListener(IPreSkinningListener* l) override;
+		virtual void addListener(IPostSkinningListener* l) override;
+		virtual void removeListener(IPostSkinningListener* l) override;
 
 		void onPostPostLoad();
 
 		void onPreStep(const PreStepEvent& e) { m_preStepDispatcher.SendEvent(std::addressof(e)); }
 		void onPostStep(const PostStepEvent& e) { m_postStepDispatcher.SendEvent(std::addressof(e)); }
 		void onPreSkinning(const PreSkinningEvent& e) { m_preSkinningDispatcher.SendEvent(std::addressof(e)); }
+		void onPostSkinning(const PostSkinningEvent& e) { m_postSkinningDispatcher.SendEvent(std::addressof(e)); }
 
 		void init(const SKSE::LoadInterface* skse);
 
@@ -37,6 +40,7 @@ namespace hdt
 		RE::BSTEventSource<PreStepEvent> m_preStepDispatcher;
 		RE::BSTEventSource<PostStepEvent> m_postStepDispatcher;
 		RE::BSTEventSource<PreSkinningEvent> m_preSkinningDispatcher;
+		RE::BSTEventSource<PostSkinningEvent> m_postSkinningDispatcher;
 
 		SKSE::PluginHandle m_sksePluginHandle;
 		SKSE::MessagingInterface* m_skseMessagingInterface;
