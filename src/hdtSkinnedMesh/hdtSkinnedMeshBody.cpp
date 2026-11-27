@@ -5,6 +5,7 @@
 #include <tbb/tbb.h>
 
 #include <atomic>
+#include <cfloat>
 
 namespace hdt
 {
@@ -201,6 +202,99 @@ namespace hdt
 
 		m_shape->internalUpdate();
 		m_bulletShape.m_aabb = m_shape->m_tree.aabbAll;
+	}
+
+
+	void SkinnedMeshBody::notifyPostSkinning(bool pointCollidersUpdated)
+	{
+		const PostSkinningEvent postSkinningEvent = [this, pointCollidersUpdated] {
+			PostSkinningEvent event{};
+			event.bodyId = m_wbvpBodyId;
+			event.ownerFormId = m_wbvpOwnerFormId;
+			event.bodyName = m_name.c_str();
+			event.vertexCount = m_vpos.size();
+			auto* pointShape = m_shape->asPerVertexShape();
+			auto* triangleShape = m_shape->asPerTriangleShape();
+			event.pointColliderCount = pointShape && pointCollidersUpdated ? pointShape->m_colliders.size() : 0;
+			event.triangleColliderCount = triangleShape ? triangleShape->m_colliders.size() : 0;
+			event.usesBoneSphereBroadphase = m_useBoundingSphere;
+			event.usesTriangleShape = triangleShape != nullptr;
+			event.context = this;
+			event.getCollisionPosition = [](void* context, std::size_t index, float outXYZ[3]) -> bool {
+				const auto* body = static_cast<const SkinnedMeshBody*>(context);
+				if (!body || !outXYZ || index >= body->m_vpos.size()) return false;
+				const auto p = body->m_vpos[index].pos();
+				outXYZ[0] = static_cast<float>(p.x());
+				outXYZ[1] = static_cast<float>(p.y());
+				outXYZ[2] = static_cast<float>(p.z());
+				return true;
+			};
+			event.transformSkinPosition = [](void* context, std::size_t index, const float skinXYZ[3], float outXYZ[3]) -> bool {
+				const auto* body = static_cast<const SkinnedMeshBody*>(context);
+				if (!body || !skinXYZ || !outXYZ || index >= body->m_vertices.size()) return false;
+				const auto& vertex = body->m_vertices[index];
+				const __m128 skinPos = _mm_set_ps(0.0f, skinXYZ[2], skinXYZ[1], skinXYZ[0]);
+				__m128 result = _mm_setzero_ps();
+				for (int i = 0; i < 4; ++i) {
+					const auto boneIndex = vertex.getBoneIdx(i);
+					if (boneIndex >= body->m_bones.size()) return false;
+					result = _mm_add_ps(result, calcVertexState(skinPos, body->m_bones[boneIndex], _mm_set1_ps(vertex.m_weight[i])));
+				}
+				alignas(16) float xyz[4]{};
+				_mm_store_ps(xyz, result);
+				outXYZ[0] = xyz[0];
+				outXYZ[1] = xyz[1];
+				outXYZ[2] = xyz[2];
+				return true;
+			};
+			event.getPointCollider = [](void* context, std::size_t index, PointColliderInfo* outInfo) -> bool {
+				auto* body = static_cast<SkinnedMeshBody*>(context);
+				if (!body || !outInfo) return false;
+				auto* shapeBase = body->m_shape.get();
+				if (!shapeBase) return false;
+				const auto* shape = shapeBase->asPerVertexShape();
+				if (!shape || index >= shape->m_colliders.size() || index >= shape->m_aabb.size()) return false;
+				const auto& collider = shape->m_colliders[index];
+				if (collider.vertex >= body->m_vpos.size()) return false;
+				outInfo->vertexIndex = collider.vertex;
+				outInfo->flexible = collider.flexible;
+				outInfo->effectiveRadius = body->m_vpos[collider.vertex].marginMultiplier() * shape->m_shapeProp.margin;
+				const auto& aabb = shape->m_aabb[index];
+				for (int axis = 0; axis < 3; ++axis) {
+					outInfo->aabbMin[axis] = aabb.m_min.m128_f32[axis];
+					outInfo->aabbMax[axis] = aabb.m_max.m128_f32[axis];
+				}
+				return true;
+			};
+			event.getTriangleCollider = [](void* context, std::size_t index, TriangleColliderInfo* outInfo) -> bool {
+				auto* body = static_cast<SkinnedMeshBody*>(context);
+				if (!body || !outInfo) return false;
+				auto* shapeBase = body->m_shape.get();
+				if (!shapeBase) return false;
+				const auto* shape = shapeBase->asPerTriangleShape();
+				if (!shape || index >= shape->m_colliders.size() || index >= shape->m_aabb.size()) return false;
+				const auto& collider = shape->m_colliders[index];
+				for (int i = 0; i < 3; ++i) {
+					if (collider.vertices[i] >= body->m_vpos.size()) return false;
+					outInfo->vertexIndices[i] = collider.vertices[i];
+				}
+				const float averageMarginMultiplier = (
+					body->m_vpos[collider.vertices[0]].marginMultiplier() +
+					body->m_vpos[collider.vertices[1]].marginMultiplier() +
+					body->m_vpos[collider.vertices[2]].marginMultiplier()) / 3.0f;
+				outInfo->flexible = collider.flexible;
+				outInfo->effectiveMargin = averageMarginMultiplier * shape->m_shapeProp.margin;
+				outInfo->effectivePenetration = averageMarginMultiplier * shape->m_shapeProp.penetration;
+				const auto& aabb = shape->m_aabb[index];
+				for (int axis = 0; axis < 3; ++axis) {
+					outInfo->aabbMin[axis] = aabb.m_min.m128_f32[axis];
+					outInfo->aabbMax[axis] = aabb.m_max.m128_f32[axis];
+				}
+				return true;
+			};
+			return event;
+		}();
+		g_pluginInterface.onPostSkinning(postSkinningEvent);
 	}
 
 	float SkinnedMeshBody::flexible(const Vertex& v)
