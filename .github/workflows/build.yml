@@ -12,6 +12,7 @@ on:
       # run: that push has an empty changed-file list, so the paths filter below matches nothing.
       # Push one commit touching a listed path to start the build.
       - "ci/**"
+      - "diag/broadphase-sphere-audit"
     paths:
       - "**.cpp"
       - "**.h"
