@@ -63,3 +63,17 @@ void hdt::PluginInterfaceImpl::removeListener(IPreSkinningListener* l)
 		m_preSkinningDispatcher.RemoveEventSink(l);
 	}
 }
+
+void hdt::PluginInterfaceImpl::addListener(IPostSkinningListener* l)
+{
+	if (l) {
+		m_postSkinningDispatcher.AddEventSink(l);
+	}
+}
+
+void hdt::PluginInterfaceImpl::removeListener(IPostSkinningListener* l)
+{
+	if (l) {
+		m_postSkinningDispatcher.RemoveEventSink(l);
+	}
+}
