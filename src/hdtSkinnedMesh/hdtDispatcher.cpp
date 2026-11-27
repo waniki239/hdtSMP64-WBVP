@@ -1,6 +1,7 @@
 #include "hdtDispatcher.h"
 #include "hdtSkinnedMeshAlgorithm.h"
 #include "hdtSkinnedMeshBody.h"
+#include "../PluginInterfaceImpl.h"
 
 #include <LinearMath/btPoolAllocator.h>
 #include <algorithm>
@@ -138,16 +139,20 @@ namespace hdt
 		}
 
 
-		// At this point each candidate body's final vertex positions and all
-		// point/triangle collider AABBs are current. Notify read-only observers
-		// immediately before the BVH/narrowphase collision checks.
-		for (auto* body : bodies) {
-			bool pointCollidersUpdated = body->m_shape->asPerTriangleShape() == nullptr;
-			if (auto* triangleShape = body->m_shape->asPerTriangleShape()) {
-				auto* pointShape = triangleShape->m_verticesCollision.get();
-				pointCollidersUpdated = std::find(extra_vertex_shapes.begin(), extra_vertex_shapes.end(), pointShape) != extra_vertex_shapes.end();
+		// The post-skinning snapshot is diagnostic-only. Avoid walking candidate
+		// bodies and constructing events entirely when no plugin opted in.
+		if (g_pluginInterface.hasPostSkinningListeners()) {
+			// At this point each candidate body's final vertex positions and all
+			// point/triangle collider AABBs are current. Notify read-only observers
+			// immediately before the BVH/narrowphase collision checks.
+			for (auto* body : bodies) {
+				bool pointCollidersUpdated = body->m_shape->asPerTriangleShape() == nullptr;
+				if (auto* triangleShape = body->m_shape->asPerTriangleShape()) {
+					auto* pointShape = triangleShape->m_verticesCollision.get();
+					pointCollidersUpdated = std::find(extra_vertex_shapes.begin(), extra_vertex_shapes.end(), pointShape) != extra_vertex_shapes.end();
+				}
+				body->notifyPostSkinning(pointCollidersUpdated);
 			}
-			body->notifyPostSkinning(pointCollidersUpdated);
 		}
 
 		{
