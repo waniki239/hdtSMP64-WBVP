@@ -1,65 +1,89 @@
 # WBVP FSMP integration
 
-This fork adds a narrow, versioned extension point to FSMP. It does not expose
-FSMP's private `Vertex` layout or `SkinnedMeshBody` object to third-party code.
+This fork exposes a versioned, read-only diagnostic API for WBVP. It does not
+expose FSMP's private `Vertex` layout or `SkinnedMeshBody` object to third-party
+code.
 
-## API
+## Versioning
 
-`PluginAPI.h` increments `INTERFACE_VERSION` from 2.0.0 to 2.1.0. A plugin
-may register an `IPreSkinningListener` and receive `PreSkinningEvent` just
-before FSMP applies bone transforms in `SkinnedMeshBody::internalUpdate()`.
+- FSMP product/CMake version: `3.0.0` (unchanged).
+- FSMP Plugin API version: `2.2.0`.
+- WBVP consumer version for this integration: `0.2.17-beta2`.
 
-The event provides:
+These are separate version namespaces. The Plugin API minor version is bumped
+for this backwards-compatible extension; the FSMP product version is not
+changed by this integration-only API addition.
 
-- `bodyId`: unique identity for this body instance; a rebuilt body receives
-  a new ID.
-- `ownerFormId`: skeleton-owner FormID copied at body construction; zero if
-  UserData is unavailable.
-- `bodyName`: FSMP body name.
-- `vertexCount`: current compacted FSMP skin-vertex count.
-- `usesBoundingSphere`: current update mode, useful for diagnostics.
-- `getSkinPosition` / `setSkinPosition`: bounded access to skin-space
-  positions.
-- `context`: opaque callback context valid only until the event returns.
+## API 2.1: pre-skinning
 
-## Threading contract
+An `IPreSkinningListener` receives `PreSkinningEvent` immediately before
+FSMP applies bone transforms in `SkinnedMeshBody::internalUpdate()`. It
+provides bounded access to skin-space positions through
+`getSkinPosition` / `setSkinPosition`, plus body identity and owner metadata.
 
-The callback runs on the FSMP physics/update thread. CommonLib's
-`BSTEventSource::SendEvent` holds its spin lock while invoking listeners.
-Callbacks sent through this dispatcher are therefore serialized with respect
-to one another, but must remain very short and real-time safe.
+## API 2.2: post-skinning collision snapshot
 
-Do not block, allocate memory, perform file I/O, log synchronously, call
-game-thread-only APIs, or register/unregister listeners from inside the
-callback. Do not retain `context`, `bodyName`, or any other event-owned
-pointer. Publish precomputed deformation data as an immutable snapshot and
-perform only bounded reads/writes in the callback. Unregister listeners during
-plugin shutdown, outside the callback.
+An `IPostSkinningListener` receives `PostSkinningEvent` after the candidate
+body's final skinned vertex positions and required collider data have been
+updated, immediately before FSMP's BVH/narrowphase collision-pair checks.
+
+The event exposes:
+
+- Body identity, owner FormID, body name, and final skinned vertex count.
+- `getCollisionPosition`: final FSMP collision vertex position (`m_vpos`).
+- `transformSkinPosition`: transforms a supplied skin-space position through
+  the same body's current bone weights/transforms.
+- `getPointCollider`: point primitive vertex index, flexibility, effective
+  radius, and its AABB.
+- `getTriangleCollider`: triangle vertex indices, flexibility, effective
+  margin/penetration, and its AABB.
+- `usesBoneSphereBroadphase`: whether bone spheres are used for broadphase
+  bounds. This does not mean detailed point/triangle primitives are absent.
+- `usesTriangleShape`: whether the body's detailed shape is triangle-based.
+
+The point-collider companion shape for a triangle body is reported only when
+FSMP updated that companion shape for the current candidate-pair set.
+Otherwise `pointColliderCount` is zero. The triangle primitive set is still
+reported. The API exports active primitive lists and their AABBs, not the
+internal BVH node hierarchy.
+
+## Candidate-pair and threading contract
+
+The post-skinning callback is emitted only for bodies present in the
+broadphase-selected candidate-pair body list for that dispatcher update. A
+body that is not part of a candidate pair in a frame does not emit an event
+for that frame. This is not a global per-frame snapshot of every equipped body.
+
+The callback runs on the FSMP physics/update thread. The event and its
+accessors are valid only until the listener returns. Do not block, allocate
+memory, perform file I/O, log synchronously, call game-thread-only APIs, or
+register/unregister listeners inside the callback. Do not retain `context`,
+`bodyName`, or any event-owned pointer. Keep the callback bounded and
+real-time safe. Unregister listeners during plugin shutdown, outside callbacks.
+
+## Compatibility
+
+A plugin requiring final collision diagnostics must verify interface major
+version 2 and minor version at least 2 before registering an
+`IPostSkinningListener`. API 2.1 remains usable for pre-skinning deformation,
+but does not provide final collision snapshots. Do not fall back to private
+function hooks or memory scanning.
 
 ## Upstream maintenance
 
 - Upstream: `https://github.com/DaymareOn/hdtSMP64`
 - Tracking branch: `dev`
-- Fork base: `e52ad960048c14e637d14fcbd65314ca017fc3b8`
-- API extension version: `2.1.0`
+- Fork integration branch: `wbvp-integration`
+- API extension branch: `wbvp-pluginapi-2.2.0-final-collision-diagnostics`
 
-WBVP changes are deliberately isolated to Plugin API/dispatcher declarations,
-the pre-skinning dispatch point, body identity metadata, and skeleton-owner
-FormID capture. When upstream changes, rebase or merge upstream first, review
-these integration points, confirm that the callback still runs immediately
-before the skinning loop, then build and run the API smoke test. If FSMP changes
-its body update lifecycle, stop and re-evaluate the event location rather than
-mechanically resolving the conflict.
-
-## Compatibility behavior
-
-WBVP must require interface major version 2 and minor version at least 1 before
-registering. On older FSMP versions, log a warning and leave collision
-deformation disabled. Do not fall back to private function hooks or memory
-scanning.
+WBVP-specific changes are isolated to Plugin API/dispatcher declarations,
+the pre- and post-skinning dispatch points, and body metadata/accessors. When
+upstream changes, merge or rebase upstream first, review these integration
+points, confirm callback timing and threading, then build and run API smoke
+tests. If FSMP changes its body update lifecycle, re-evaluate the event
+location instead of mechanically resolving conflicts.
 
 ## Status
 
-This is the FSMP-side API scaffold. WBVP's listener implementation and mapping
-to FSMP's compacted vertex order are subsequent work; this API does not assume
-that NIF partition order equals FSMP's final compacted vertex order.
+The API implementation is present on the API 2.2 development branch. It still
+requires an FSMP build and in-game validation with WBVP Beta 2.

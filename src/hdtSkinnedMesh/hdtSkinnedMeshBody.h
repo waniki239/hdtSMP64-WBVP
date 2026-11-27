@@ -87,6 +87,7 @@ namespace hdt
 
 		void finishBuild();
 		virtual void internalUpdate();
+		void notifyPostSkinning(bool pointCollidersUpdated);
 
 		std::vector<SkinnedBone> m_skinnedBones;
 		std::vector<Bone> m_bones;

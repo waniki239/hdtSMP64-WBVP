@@ -65,6 +65,49 @@ namespace hdt
 
 	using IPreSkinningListener = RE::BSTEventSink<PreSkinningEvent>;
 
+	// Read-only snapshot of one FSMP collision update. The callback runs on the
+	// physics/update thread for broadphase-selected candidate bodies, after their
+	// required collider data is updated and immediately before BVH/narrowphase.
+	// The event and its accessors are valid only until the listener returns;
+	// never retain context or call game-thread-only APIs from the listener.
+	struct PointColliderInfo
+	{
+		std::uint32_t vertexIndex{ 0 };
+		float flexible{ 0.0f };
+		float effectiveRadius{ 0.0f };
+		float aabbMin[3]{};
+		float aabbMax[3]{};
+	};
+
+	struct TriangleColliderInfo
+	{
+		std::uint32_t vertexIndices[3]{};
+		float flexible{ 0.0f };
+		float effectiveMargin{ 0.0f };
+		float effectivePenetration{ 0.0f };
+		float aabbMin[3]{};
+		float aabbMax[3]{};
+	};
+
+	struct PostSkinningEvent
+	{
+		std::uint64_t bodyId{ 0 };
+		std::uint32_t ownerFormId{ 0 };
+		const char* bodyName{ nullptr };
+		std::size_t vertexCount{ 0 };
+		std::size_t pointColliderCount{ 0 };
+		std::size_t triangleColliderCount{ 0 };
+		bool usesBoneSphereBroadphase{ false };
+		bool usesTriangleShape{ false };
+		void* context{ nullptr };
+		bool (*getCollisionPosition)(void* context, std::size_t index, float outXYZ[3]){ nullptr };
+		bool (*transformSkinPosition)(void* context, std::size_t index, const float skinXYZ[3], float outXYZ[3]){ nullptr };
+		bool (*getPointCollider)(void* context, std::size_t index, PointColliderInfo* outInfo){ nullptr };
+		bool (*getTriangleCollider)(void* context, std::size_t index, TriangleColliderInfo* outInfo){ nullptr };
+	};
+
+	using IPostSkinningListener = RE::BSTEventSink<PostSkinningEvent>;
+
 	class PluginInterface
 	{
 	public:
@@ -87,7 +130,7 @@ namespace hdt
 		};
 
 	public:
-		constexpr static Version INTERFACE_VERSION{ 2, 1, 0 };
+		constexpr static Version INTERFACE_VERSION{ 2, 2, 0 };
 		constexpr static Version BULLET_VERSION{ 3, 24, 0 };
 
 	public:
@@ -103,5 +146,9 @@ namespace hdt
 
 		virtual void addListener(IPreSkinningListener*) = 0;
 		virtual void removeListener(IPreSkinningListener*) = 0;
+
+		// Appended in API 2.2 to preserve the existing 2.1 vtable prefix.
+		virtual void addListener(IPostSkinningListener*) = 0;
+		virtual void removeListener(IPostSkinningListener*) = 0;
 	};
 }

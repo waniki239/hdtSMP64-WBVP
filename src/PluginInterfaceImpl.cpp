@@ -63,3 +63,22 @@ void hdt::PluginInterfaceImpl::removeListener(IPreSkinningListener* l)
 		m_preSkinningDispatcher.RemoveEventSink(l);
 	}
 }
+
+void hdt::PluginInterfaceImpl::addListener(IPostSkinningListener* l)
+{
+	if (l) {
+		m_postSkinningDispatcher.AddEventSink(l);
+		m_postSkinningListenerCount.fetch_add(1, std::memory_order_release);
+	}
+}
+
+void hdt::PluginInterfaceImpl::removeListener(IPostSkinningListener* l)
+{
+	if (l) {
+		m_postSkinningDispatcher.RemoveEventSink(l);
+		auto count = m_postSkinningListenerCount.load(std::memory_order_relaxed);
+		while (count != 0 && !m_postSkinningListenerCount.compare_exchange_weak(
+			count, count - 1, std::memory_order_release, std::memory_order_relaxed)) {
+		}
+	}
+}

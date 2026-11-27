@@ -28,6 +28,7 @@ See the [Hall of Fame](https://github.com/DaymareOn/hdtSMP64/wiki/01-%E2%80%90-H
 
 ## WBVP fork notes
 
-This fork tracks `DaymareOn/hdtSMP64` on the `dev` branch. WBVP-specific
-changes and upstream update guidance are documented in
-`WBVP-FSMP-INTEGRATION.md` and `WBVP-FSMP-UPSTREAM.md`.
+This fork tracks `DaymareOn/hdtSMP64` on the `dev` branch. WBVP-specific changes and upstream update guidance are documented in
+`WBVP-FSMP-INTEGRATION.md` and `WBVP-FSMP-UPSTREAM.md`. The current
+WBVP Beta 2 diagnostics integration uses Plugin API `2.2.0`; this is separate
+from the FSMP product/CMake version `3.0.0`.
