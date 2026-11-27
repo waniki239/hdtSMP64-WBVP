@@ -11,6 +11,7 @@ namespace hdt
 {
 	namespace
 	{
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
 		std::atomic<uint64_t> g_broadphasePairDispatchAuditFrame{ 0 };
 
 		bool isBroadphasePairAuditTarget(const SkinnedMeshBody* body)
@@ -18,6 +19,7 @@ namespace hdt
 			return body && body->m_name.c_str() &&
 				std::string_view(body->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos;
 		}
+#endif
 	}
 	void CollisionDispatcher::clearAllManifold()
 	{
@@ -168,7 +170,9 @@ namespace hdt
 			tbb::parallel_for_each(m_pairs.begin(), m_pairs.end(), [&, this](const std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
 				// collapseCollideL is a candidate for optimizations since we'll re-traverse the tree in checkCollisionL. However,
 				// it's a bit tricky since collapse has an early-exit, and avoiding boilerplate is ideal. A traversal resume maybe?
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
 				const bool targetPair = isBroadphasePairAuditTarget(i.first) || isBroadphasePairAuditTarget(i.second);
+#endif
 				const bool midphaseOverlap = i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree);
 #if defined(HDT_BROADPHASE_SPHERE_AUDIT)
 				if (auditSample && targetPair) {
