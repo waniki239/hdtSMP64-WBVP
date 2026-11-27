@@ -5,6 +5,9 @@
 #include "hdtSkyrimPhysicsWorld.h"
 #include "hdtSkyrimSystem.h"
 #include <algorithm>
+#include <atomic>
+#include <string_view>
+#include "hdtSkinnedMeshBody.h"
 #include <cmath>
 #include <thread>
 #include <unordered_map>
@@ -14,6 +17,17 @@ namespace hdt
 {
 	namespace
 	{
+		std::atomic<uint64_t> g_broadphaseAuditFrame{ 0 };
+
+		bool isBroadphaseAuditTarget(const btCollisionObject* object)
+		{
+			if (!object || !object->getCollisionShape() ||
+				object->getCollisionShape()->getShapeType() != CUSTOM_CONCAVE_SHAPE_TYPE)
+				return false;
+			auto* body = static_cast<const SkinnedMeshBody*>(object);
+			return body->m_name.c_str() && std::string_view(body->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos;
+		}
+
 		int initBulletTbbAndGetThreadCount()
 		{
 			auto* scheduler = btGetTBBTaskScheduler();
@@ -184,6 +198,11 @@ namespace hdt
 	{
 		BT_PROFILE("performDiscreteCollisionDetection");
 
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+		const auto auditFrame = g_broadphaseAuditFrame.fetch_add(1, std::memory_order_relaxed) + 1;
+		const bool auditSample = (auditFrame % 60) == 1;
+#endif
+
 		for (auto& system : m_systems) {
 			system->internalUpdate();
 		}
@@ -200,10 +219,42 @@ namespace hdt
 			btVector3 minAabb, maxAabb;
 			colObj->getCollisionShape()->getAabb(colObj->getWorldTransform(), minAabb, maxAabb);
 
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+			if (auditSample && isBroadphaseAuditTarget(colObj)) {
+				logger::info("[BroadphasePairAuditAabb] frame={} body={} min=({},{},{}) max=({},{},{})",
+					auditFrame, static_cast<SkinnedMeshBody*>(colObj)->m_name.c_str(),
+					minAabb.getX(), minAabb.getY(), minAabb.getZ(),
+					maxAabb.getX(), maxAabb.getY(), maxAabb.getZ());
+			}
+#endif
+
 			m_broadphasePairCache->setAabb(proxy, minAabb, maxAabb, m_dispatcher1);
 		}
 
 		m_broadphasePairCache->calculateOverlappingPairs(m_dispatcher1);
+
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+		if (auditSample) {
+			const auto pairCount = m_broadphasePairCache->getOverlappingPairCache()->getNumOverlappingPairs();
+			int targetPairCount = 0;
+			auto* pairs = m_broadphasePairCache->getOverlappingPairCache()->getOverlappingPairArrayPtr();
+			for (int i = 0; i < pairCount; ++i) {
+				auto* object0 = static_cast<btCollisionObject*>(pairs[i].m_pProxy0->m_clientObject);
+				auto* object1 = static_cast<btCollisionObject*>(pairs[i].m_pProxy1->m_clientObject);
+				if (!isBroadphaseAuditTarget(object0) && !isBroadphaseAuditTarget(object1))
+					continue;
+				++targetPairCount;
+				auto* target = isBroadphaseAuditTarget(object0) ? static_cast<SkinnedMeshBody*>(object0) : static_cast<SkinnedMeshBody*>(object1);
+				auto* other = target == object0 ? object1 : object0;
+				const char* otherName = other->getCollisionShape()->getShapeType() == CUSTOM_CONCAVE_SHAPE_TYPE
+					? static_cast<SkinnedMeshBody*>(other)->m_name.c_str() : other->getCollisionShape()->getName();
+				logger::info("[BroadphasePairAuditRawPair] frame={} target={} other={} pairIndex={}",
+					auditFrame, target->m_name.c_str(), otherName ? otherName : "<unnamed>", i);
+			}
+			logger::info("[BroadphasePairAuditSummary] frame={} broadphasePairs={} targetPairs={}",
+				auditFrame, pairCount, targetPairCount);
+		}
+#endif
 
 		if (m_dispatcher1) {
 			m_dispatcher1->dispatchAllCollisionPairs(m_broadphasePairCache->getOverlappingPairCache(), dispatchInfo, m_dispatcher1);
