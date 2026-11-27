@@ -6,6 +6,8 @@ project(
 	LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(HDT_BROADPHASE_SPHERE_AUDIT "Enable diagnostic audit of FSMP broadphase bone spheres" OFF)
+
 # Pre-release build identifier (e.g. "dev-abc1234"). Empty for production builds.
 set(PROJECT_BUILD_INFO
 	""

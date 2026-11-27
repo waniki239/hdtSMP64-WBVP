@@ -1,6 +1,7 @@
 #include "hdtSkinnedMeshAlgorithm.h"
 #include "hdtCollider.h"
 #include <tbb/task_arena.h>
+#include <string_view>
 
 namespace hdt
 {
@@ -433,6 +434,11 @@ namespace hdt
 	{
 		// only visit cells that were actually written to this frame,
 		// instead of looping all bones0 * bones1 (far fewer iterations)
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+		const bool auditTarget = (body0->m_name.c_str() && std::string_view(body0->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos) ||
+			(body1->m_name.c_str() && std::string_view(body1->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos);
+		uint32_t auditManifoldAddCalls = 0;
+#endif
 		for (int flatIdx : activeCells) {
 			int i = flatIdx / mergeStride;
 			int j = flatIdx % mergeStride;
@@ -478,13 +484,33 @@ namespace hdt
 
 			auto maniford = dispatcher->getNewManifold(&rb0->m_rig, &rb1->m_rig);
 			maniford->addManifoldPoint(newPt);
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+			if (auditTarget)
+				++auditManifoldAddCalls;
+#endif
 		}
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+		if (auditTarget) {
+			logger::info("[CollisionContactAuditMerge] body0={} body1={} activeMergeCells={} manifoldAddCalls={}",
+				body0->m_name.c_str(), body1->m_name.c_str(), activeCells.size(), auditManifoldAddCalls);
+		}
+#endif
 	}
 
 	template <class T0, class T1>
 	void SkinnedMeshAlgorithm::processCollision(T0* shape0, T1* shape1, MergeBuffer& merge, CollisionResult* collision)
 	{
 		int count = std::min(checkCollide(shape0, shape1, collision), MaxCollisionCount);
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+		const auto* auditBody0 = shape0->m_owner;
+		const auto* auditBody1 = shape1->m_owner;
+		const bool auditTarget = (auditBody0->m_name.c_str() && std::string_view(auditBody0->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos) ||
+			(auditBody1->m_name.c_str() && std::string_view(auditBody1->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos);
+		if (auditTarget) {
+			logger::info("[CollisionContactAuditCandidates] body0={} body1={} acceptedColliderResults={}",
+				auditBody0->m_name.c_str(), auditBody1->m_name.c_str(), count);
+		}
+#endif
 		if (count > 0) {
 			// results come back in random order from parallel workers, sort so doMerge's
 			// early break actually bails on shallow contacts instead of random ones

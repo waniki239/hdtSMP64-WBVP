@@ -181,6 +181,10 @@ add_library("${PROJECT_NAME}" SHARED ${SOURCE_FILES} "${VERSION_HEADER}" "${CMAK
 
 target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
 
+if(HDT_BROADPHASE_SPHERE_AUDIT)
+	target_compile_definitions("${PROJECT_NAME}" PRIVATE HDT_BROADPHASE_SPHERE_AUDIT)
+endif()
+
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	target_compile_options(
 		"${PROJECT_NAME}"

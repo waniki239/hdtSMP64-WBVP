@@ -4,9 +4,23 @@
 
 #include <LinearMath/btPoolAllocator.h>
 #include <algorithm>
+#include <atomic>
+#include <string_view>
 
 namespace hdt
 {
+	namespace
+	{
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+		std::atomic<uint64_t> g_broadphasePairDispatchAuditFrame{ 0 };
+
+		bool isBroadphasePairAuditTarget(const SkinnedMeshBody* body)
+		{
+			return body && body->m_name.c_str() &&
+				std::string_view(body->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos;
+		}
+#endif
+	}
 	void CollisionDispatcher::clearAllManifold()
 	{
 		std::lock_guard<decltype(m_lock)> l(m_lock);
@@ -68,6 +82,11 @@ namespace hdt
 	{
 		BT_PROFILE("HDTSMP_dispatchAllCollisionPairs");
 
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+		const auto auditFrame = g_broadphasePairDispatchAuditFrame.fetch_add(1, std::memory_order_relaxed) + 1;
+		const bool auditSample = (auditFrame % 60) == 1;
+#endif
+
 		auto size = pairCache->getNumOverlappingPairs();
 		if (!size)
 			return;
@@ -98,7 +117,15 @@ namespace hdt
 				auto shape0 = skinned0 ? static_cast<SkinnedMeshBody*>(obj0) : nullptr;
 				auto shape1 = skinned1 ? static_cast<SkinnedMeshBody*>(obj1) : nullptr;
 
-				if (hdt::needsCollision(shape0, shape1)) {
+				const bool allowed = hdt::needsCollision(shape0, shape1);
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+				if (auditSample && (isBroadphasePairAuditTarget(shape0) || isBroadphasePairAuditTarget(shape1))) {
+					logger::info("[BroadphasePairAuditFilter] frame={} body0={} body1={} needsCollision={}",
+						auditFrame, shape0 ? shape0->m_name.c_str() : "<null>",
+						shape1 ? shape1->m_name.c_str() : "<null>", allowed);
+				}
+#endif
+				if (allowed) {
 					bodies.push_back(shape0);
 					bodies.push_back(shape1);
 					m_pairs.push_back(std::make_pair(shape0, shape1));
@@ -143,9 +170,25 @@ namespace hdt
 			tbb::parallel_for_each(m_pairs.begin(), m_pairs.end(), [&, this](const std::pair<SkinnedMeshBody*, SkinnedMeshBody*>& i) {
 				// collapseCollideL is a candidate for optimizations since we'll re-traverse the tree in checkCollisionL. However,
 				// it's a bit tricky since collapse has an early-exit, and avoiding boilerplate is ideal. A traversal resume maybe?
-				if (i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree)) {
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+				const bool targetPair = isBroadphasePairAuditTarget(i.first) || isBroadphasePairAuditTarget(i.second);
+#endif
+				const bool midphaseOverlap = i.first->m_shape->m_tree.collapseCollideL(&i.second->m_shape->m_tree);
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+				if (auditSample && targetPair) {
+					logger::info("[BroadphasePairAuditMidphase] frame={} body0={} body1={} overlap={}",
+						auditFrame, i.first->m_name.c_str(), i.second->m_name.c_str(), midphaseOverlap);
+				}
+#endif
+				if (midphaseOverlap) {
 					BT_PROFILE("HDTSMP_processCollision");
 					SkinnedMeshAlgorithm::processCollision(i.first, i.second, this);
+#if defined(HDT_BROADPHASE_SPHERE_AUDIT)
+					if (auditSample && targetPair) {
+						logger::info("[BroadphasePairAuditNarrowphase] frame={} body0={} body1={} invoked=true",
+							auditFrame, i.first->m_name.c_str(), i.second->m_name.c_str());
+					}
+#endif
 				}
 			});
 		}

@@ -15,6 +15,7 @@ namespace hdt
 		float depth;
 	};
 
+
 	class SkinnedMeshAlgorithm
 	{
 	public:
@@ -108,9 +109,9 @@ namespace hdt
 			}
 
 			template <class T0, class T1>
-			void doMerge(T0* shape0, T1* shape1, CollisionResult* collisions, int count);
+			void doMerge(T0* shape0, T1* shape1, CollisionResult* collisions, int count\n#if defined(HDT_BROADPHASE_SPHERE_AUDIT)\n\t\t\t\t, CollisionAuditStats* audit\n#endif\n\t\t\t);
 
-			void apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, CollisionDispatcher* dispatcher);
+			void apply(SkinnedMeshBody* body0, SkinnedMeshBody* body1, CollisionDispatcher* dispatcher\n#if defined(HDT_BROADPHASE_SPHERE_AUDIT)\n\t\t\t\t, CollisionAuditStats* audit\n#endif\n\t\t\t);
 
 			int mergeStride;
 			int mergeSize;
@@ -121,6 +122,6 @@ namespace hdt
 		};
 
 		template <class T0, class T1>
-		static void processCollision(T0* shape0, T1* shape1, MergeBuffer& merge, CollisionResult* collision);
+		static void processCollision(T0* shape0, T1* shape1, MergeBuffer& merge, CollisionResult* collision\n#if defined(HDT_BROADPHASE_SPHERE_AUDIT)\n\t\t\t, CollisionAuditStats* audit\n#endif\n\t\t);
 	};
 }
