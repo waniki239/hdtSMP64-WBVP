@@ -507,10 +507,8 @@ namespace hdt
 		const bool auditTarget = (auditBody0->m_name.c_str() && std::string_view(auditBody0->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos) ||
 			(auditBody1->m_name.c_str() && std::string_view(auditBody1->m_name.c_str()).find("_HP2colWigFull") != std::string_view::npos);
 		if (auditTarget) {
-			logger::info("[CollisionContactAuditCandidates] body0={} body1={} shape0={} shape1={} acceptedColliderResults={}",
-				auditBody0->m_name.c_str(), auditBody1->m_name.c_str(),
-				auditBody0->m_shape->asPerTriangleShape() ? "triangle" : "vertex",
-				auditBody1->m_shape->asPerTriangleShape() ? "triangle" : "vertex", count);
+			logger::info("[CollisionContactAuditCandidates] body0={} body1={} acceptedColliderResults={}",
+				auditBody0->m_name.c_str(), auditBody1->m_name.c_str(), count);
 		}
 #endif
 		if (count > 0) {
